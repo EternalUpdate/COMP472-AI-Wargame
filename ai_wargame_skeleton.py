@@ -50,7 +50,6 @@ class Unit:
     player: Player = Player.Attacker
     type: UnitType = UnitType.Program
     health: int = 9
-    in_combat: bool = False
 
     # class variable: damage table for units (based on the unit type constants in order)
     damage_table: ClassVar[list[list[int]]] = [
@@ -72,8 +71,6 @@ class Unit:
     def is_alive(self) -> bool:
         """Are we alive ?"""
         return self.health > 0
-
-
 
     def mod_health(self, health_delta: int):
         """Modify this unit's health by delta amount."""
@@ -304,6 +301,15 @@ class Game:
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
 
+    def is_in_combat(self, coord: Coord) -> bool:
+        """Check if unit at Coord is in combat."""
+        unit = self.get(coord)
+        if unit is not None:
+            for adj in coord.iter_adjacent():
+                target = self.get(adj)
+                if target is not None and target.player != unit.player:
+                    return True
+        return False
 
     def remove_dead(self, coord: Coord):
         """Remove unit at Coord if dead."""
