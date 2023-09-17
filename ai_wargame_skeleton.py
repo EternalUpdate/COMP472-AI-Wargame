@@ -152,6 +152,22 @@ class Coord:
         yield Coord(self.row + 1, self.col)
         yield Coord(self.row, self.col + 1)
 
+    def up(self) -> Coord:
+        """Coord above this one."""
+        return Coord(self.row - 1, self.col)
+
+    def down(self) -> Coord:
+        """Coord below this one."""
+        return Coord(self.row + 1, self.col)
+
+    def left(self) -> Coord:
+        """Coord to the left of this one."""
+        return Coord(self.row, self.col - 1)
+
+    def right(self) -> Coord:
+        """Coord to the right of this one."""
+        return Coord(self.row, self.col + 1)
+
     @classmethod
     def from_string(cls, s: str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
@@ -333,11 +349,43 @@ class Game:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
-        unit = self.get(coords.src)
-        if unit is None or unit.player != self.next_player:
+
+        current_unit = self.get(coords.src)
+        target_unit = self.get(coords.dst)
+
+        if current_unit is None or current_unit.player != self.next_player:
             return False
-        unit = self.get(coords.dst)
-        return (unit is None)
+
+        # attacking
+        if target_unit is not None:
+            return True
+
+        # moving
+        match self.next_player:
+            case Player.Attacker:
+                if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
+                    if self.is_in_combat(coords.src):
+                        print("The unit is in combat and can't move!")
+                        return False
+                    if coords.dst == coords.src.up() or coords.dst == coords.src.left():
+                        return True
+                if current_unit.type == UnitType.Tech or current_unit.type == UnitType.Virus:
+                    for adj in coords.src.iter_adjacent():
+                        if adj == coords.dst:
+                            return True
+            case Player.Defender:
+                if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
+                    if self.is_in_combat(coords.src):
+                        print("The unit is in combat and can't move!")
+                        return False
+                    if coords.dst == coords.src.down() or coords.dst == coords.src.right():
+                        return True
+                if current_unit.type == UnitType.Tech or current_unit.type == UnitType.Virus:
+                    for adj in coords.src.iter_adjacent():
+                        if adj == coords.dst:
+                            return True
+
+        return False
 
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
