@@ -152,6 +152,13 @@ class Coord:
         yield Coord(self.row + 1, self.col)
         yield Coord(self.row, self.col + 1)
 
+    def has_adjacent(self, target: Coord) -> bool:
+        """Checks if a Coord is adjacent to this one."""
+        for adj in self.iter_adjacent():
+            if adj == target:
+                return True
+        return False
+
     def up(self) -> Coord:
         """Coord above this one."""
         return Coord(self.row - 1, self.col)
@@ -356,7 +363,10 @@ class Game:
         if current_unit is None or current_unit.player != self.next_player:
             return False
 
-        # attacking
+        if not coords.src.has_adjacent(coords.dst):
+            return False
+
+        # attacking / repairing
         if target_unit is not None:
             return True
 
