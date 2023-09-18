@@ -104,6 +104,18 @@ class Unit:
             return 9 - target.health
         return amount
 
+    def attack(self, target: Unit):
+        """Attack another unit. TODO: implement"""
+        print(f"{self} attacks {target} for {self.damage_amount(target)} damage")
+
+    def repair(self, target: Unit):
+        """Repair another unit. TODO: implement"""
+        print(f"{self} repairs {target} for {self.repair_amount(target)} health")
+
+    def self_destruct(self):
+        """Self-destruct, inflicting 2 dmg to all surrounding units (including friendly units). TODO: implement"""
+        print(f"{self} self-destructs")
+
 
 ##############################################################################################################
 
@@ -357,6 +369,10 @@ class Game:
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
 
+        # self-destruct
+        if coords.src == coords.dst:
+            return True
+
         current_unit = self.get(coords.src)
         target_unit = self.get(coords.dst)
 
@@ -400,10 +416,26 @@ class Game:
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
+            current_unit = self.get(coords.src)
+            target_unit = self.get(coords.dst)
+
+            if coords.src == coords.dst:
+                current_unit.self_destruct()
+                return True, ""
+
+            if target_unit is not None:
+                if target_unit.player is not current_unit.player:
+                    current_unit.attack(target_unit)
+                    return True, ""
+                elif target_unit.player is current_unit.player:
+                    current_unit.repair(target_unit)
+                    return True, ""
+
+            # just moving
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
-            return (True, "")
-        return (False, "invalid move")
+            return True, ""
+        return False, "invalid move"
 
     def next_turn(self):
         """Transitions game to the next turn."""
