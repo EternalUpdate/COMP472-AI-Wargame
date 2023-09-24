@@ -105,16 +105,25 @@ class Unit:
         return amount
 
     def attack(self, target: Unit):
-        """Attack another unit. TODO: implement"""
-        print(f"{self} attacks {target} for {self.damage_amount(target)} damage")
+        targetDamage = -self.damage_amount(target)
+        selfDamage = -target.damage_amount(self)
 
+        self.mod_health(selfDamage)
+        target.mod_health(targetDamage)
+
+        return (True, f"{self} attacks {target} for {self.damage_amount(target)} damage")
     def repair(self, target: Unit):
-        """Repair another unit. TODO: implement"""
-        print(f"{self} repairs {target} for {self.repair_amount(target)} health")
+        
+        healAmount = self.repair_amount(target)
+        target.mod_health(healAmount)
 
-    def self_destruct(self):
-        """Self-destruct, inflicting 2 dmg to all surrounding units (including friendly units). TODO: implement"""
-        print(f"{self} self-destructs")
+        return (True, f"{self} repairs {target} for {self.repair_amount(target)} health")
+    def self_destruct(self, targets : list[Unit]):
+        for unit in targets:
+            unit.mod_health(-2)
+
+        self.mod_health(-9)
+        return (True, f"{self} self-destructs")
 
 
 ##############################################################################################################
@@ -163,6 +172,17 @@ class Coord:
         yield Coord(self.row, self.col - 1)
         yield Coord(self.row + 1, self.col)
         yield Coord(self.row, self.col + 1)
+
+    def iter_adjacent_with_diagonals(self) -> Iterable[Coord]:
+        """Iterates over adjacent Coords."""
+        yield Coord(self.row - 1, self.col - 1)
+        yield Coord(self.row - 1, self.col)
+        yield Coord(self.row - 1, self.col + 1)
+        yield Coord(self.row, self.col - 1)
+        yield Coord(self.row + 1, self.col - 1)
+        yield Coord(self.row + 1, self.col)
+        yield Coord(self.row, self.col + 1)
+        yield Coord(self.row + 1, self.col + 1)
 
     def has_adjacent(self, target: Coord) -> bool:
         """Checks if a Coord is adjacent to this one."""
@@ -412,6 +432,14 @@ class Game:
                             return True
 
         return False
+    
+    def get_adjacent_units_with_diagonals(self, coord : Coord) -> list[Unit]:
+        neighbors : list[Unit] = []
+        for adj in coord.iter_adjacent_with_diagonals():
+            neighbor = self.get(adj)
+            if neighbor is not None:
+                neighbors.append(neighbor)
+        return neighbors
 
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
@@ -420,22 +448,26 @@ class Game:
             target_unit = self.get(coords.dst)
 
             if coords.src == coords.dst:
-                current_unit.self_destruct()
-                return True, ""
+                output = current_unit.self_destruct(self.get_adjacent_units_with_diagonals(coords.src))
+                for cell in coords.src.iter_adjacent_with_diagonals():
+                    self.remove_dead(cell)
+                self.remove_dead(coords.src)
+                return output
 
             if target_unit is not None:
                 if target_unit.player is not current_unit.player:
-                    current_unit.attack(target_unit)
-                    return True, ""
+                    output = current_unit.attack(target_unit)
+                    self.remove_dead(coords.src)
+                    self.remove_dead(coords.dst)
+                    return output
                 elif target_unit.player is current_unit.player:
-                    current_unit.repair(target_unit)
-                    return True, ""
-
+                    return current_unit.repair(target_unit)
+                
             # just moving
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
-            return True, ""
-        return False, "invalid move"
+            return (True, "")
+        return (False, "invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
