@@ -1,0 +1,38 @@
+The value of the timeout in seconds is: 5.0 
+The max number of turns is: 100 
+Alpha-Beta enabled?: True 
+Play mode is: GameType.AttackerVsDefender
+Initial configuration
+Next player: Attacker
+Turns played: 0
+
+    0   1   2   3   4  
+A: dA9 dT9 dF9  .   .  
+B: dT9 dP9  .   .   .  
+C: dF9  .   .   .  aP9 
+D:  .   .   .  aF9 aV9 
+E:  .   .  aP9 aV9 aA9 
+Turn: 0
+Current Player: Attacker 
+Moved from: D3 to: D3
+Next player: Attacker
+Turns played: 0
+
+    0   1   2   3   4  
+A: dA9 dT9 dF9  .   .  
+B: dT9 dP9  .   .   .  
+C: dF9  .   .   .  aP9 
+D:  .   .   .   .  aV9 
+E:  .   .  aP9 aV9 aA9 
+Turn: 1
+Current Player: Defender 
+Moved from: E4 to: E4
+Next player: Defender
+Turns played: 1
+
+    0   1   2   3   4  
+A: dA9 dT9 dF9  .   .  
+B: dT9 dP9  .   .   .  
+C: dF9  .   .   .  aP9 
+D:  .   .   .   .  aV9 
+E:  .   .  aP9 aV9  .  

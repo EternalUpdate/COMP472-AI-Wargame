@@ -107,24 +107,21 @@ class Unit:
     def attack(self, target: Unit):
         targetDamage = -self.damage_amount(target)
         selfDamage = -target.damage_amount(self)
-
         self.mod_health(selfDamage)
         target.mod_health(targetDamage)
 
         return (True, f"{self} attacks {target} for {self.damage_amount(target)} damage")
+
     def repair(self, target: Unit):
-        
+
         healAmount = self.repair_amount(target)
         target.mod_health(healAmount)
 
         return (True, f"{self} repairs {target} for {self.repair_amount(target)} health")
-    def self_destruct(self, targets : list[Unit]):
-        for unit in targets:
-            unit.mod_health(-2)
 
+    def self_destruct(self, targets: list[Unit]):
         self.mod_health(-9)
         return (True, f"{self} self-destructs")
-
 
 ##############################################################################################################
 
@@ -313,6 +310,7 @@ class Game:
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
 
+
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
         dim = self.options.dim
@@ -330,6 +328,8 @@ class Game:
         self.set(Coord(md - 2, md), Unit(player=Player.Attacker, type=UnitType.Program))
         self.set(Coord(md, md - 2), Unit(player=Player.Attacker, type=UnitType.Program))
         self.set(Coord(md - 1, md - 1), Unit(player=Player.Attacker, type=UnitType.Firewall))
+        self.output_file_initial()
+
 
     def clone(self) -> Game:
         """Make a new copy of a game for minimax recursion.
@@ -432,9 +432,9 @@ class Game:
                             return True
 
         return False
-    
-    def get_adjacent_units_with_diagonals(self, coord : Coord) -> list[Unit]:
-        neighbors : list[Unit] = []
+
+    def get_adjacent_units_with_diagonals(self, coord: Coord) -> list[Unit]:
+        neighbors: list[Unit] = []
         for adj in coord.iter_adjacent_with_diagonals():
             neighbor = self.get(adj)
             if neighbor is not None:
@@ -452,6 +452,7 @@ class Game:
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
+                self.output_file_midgame(coords.src, coords.dst)
                 return output
 
             if target_unit is not None:
@@ -459,10 +460,12 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
+                    self.output_file_midgame(coords.src, coords.dst)
                     return output
                 elif target_unit.player is current_unit.player:
+                    self.output_file_midgame(coords.src, coords.dst)
                     return current_unit.repair(target_unit)
-                
+
             # just moving
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
@@ -670,7 +673,65 @@ class Game:
             print(f"Broker error: {error}")
         return None
 
+    def output_file_initial(self):
+        b = self.options.alpha_beta
+        t = self.options.max_time
+        m = self.options.max_turns
+        file_name = f"gameTrace-{b}-{t}-{m}.txt"
+        try:
+            with open(file_name, "w") as file:
+                l1 = f"The value of the timeout in seconds is: {t} \n"
+                l2 = f"The max number of turns is: {m} \n"
+                l3 = f"Alpha-Beta enabled?: {b} \n"
+                l4 = f"Play mode is: {self.options.game_type}\n"
+                #add heuristic to options
+                #l5 = f"Heuristic used {self.options.heuristic}\n"
+                l6 = f"Initial configuration\n"
+                l7 = f"{Game.to_string(self)}"
+                file.writelines([l1, l2, l3, l4,l6,l7])
+        except IOError as e:
+            print(f"Error: {e}")
 
+    def output_file_midgame(self, src, dst):
+        b = self.options.alpha_beta
+        t = self.options.max_time
+        m = self.options.max_turns
+        file_name = f"gameTrace-{b}-{t}-{m}.txt"
+        depthEval = ""
+        depthEvalPercent = ""
+        l1 = f"Turn: {self.turns_played}\n"
+        l2 = f"Current Player: {self.next_player.name} \n"
+        l3 = f"Moved from: {src} to: {dst}\n"
+        if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker) :
+            l4 = f"Time for this action: {self.stats.total_seconds} \n"
+            l5 = ""
+
+            # l5 = f"Heuristic score: {score}\n"
+            l6 = f"The number of states evaluated since the beginning of the game: {sum(self.stats.evaluations_per_depth.values())} \n"
+            for k in sorted(self.stats.evaluations_per_depth.keys()):
+                depthEval += f"Depth: {k} has cumulative evals: {self.stats.evaluations_per_depth[k]}, \n"
+                depthEvalPercent += f"Dept: {k} has {self.stats.evaluations_per_depth[k] / sum(self.stats.evaluations_per_depth.values())}% \n"
+            l7 = "The number of states evaluated by depth: \n " + depthEval
+            l8 = "The cumulative evals by depth in Percentage: {} \n" + depthEvalPercent
+            l9 = f"Average Branching factor: {sum(self.stats.evaluations_per_depth.values()) / len(self.stats.evaluations_per_depth)}"
+        else:
+            l10 = f"{Game.to_string(self)}"
+            l4, l5, l6, l7, l8, l9 = "", "", "", "", "", ""
+        try:
+            with open(file_name, "a") as file:
+                file.writelines([l1, l2, l3, l4, l5, l6, l7, l8, l9, l10])
+        except IOError as e:
+            print(f"Error: {e}")
+    def output_file_endgame(self):
+        b = self.options.alpha_beta
+        t = self.options.max_time
+        m = self.options.max_turns
+        file_name = f"gameTrace-{b}-{t}-{m}.txt"
+        try:
+            with open(file_name, "a") as file:
+                file.writelines(f"{self.has_winner()} wins in {self.turns_played} turns")
+        except IOError as e:
+            print(f"Error: {e}")
 ##############################################################################################################
 
 def main():
@@ -714,6 +775,7 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
+            game.output_file_endgame()
             print(f"{winner.name} wins!")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
