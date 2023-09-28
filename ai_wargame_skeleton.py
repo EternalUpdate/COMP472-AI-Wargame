@@ -113,13 +113,17 @@ class Unit:
         return (True, f"{self} attacks {target} for {self.damage_amount(target)} damage")
 
     def repair(self, target: Unit):
+        if target.health == 9:
+            return (False, "invalid move")
 
         healAmount = self.repair_amount(target)
         target.mod_health(healAmount)
 
         return (True, f"{self} repairs {target} for {self.repair_amount(target)} health")
 
-    def self_destruct(self, targets: list[Unit]):
+    def self_destruct(self, targets : list[Unit]):
+        for unit in targets:
+            unit.mod_health(-2)
         self.mod_health(-9)
         return (True, f"{self} self-destructs")
 
