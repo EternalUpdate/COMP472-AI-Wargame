@@ -302,21 +302,13 @@ class Stats:
 
 ##############################################################################################################
 
-@dataclass(slots=True)
-class Stats:
-    """Representation of the global game statistics."""
-    evaluations_per_depth: dict[int, int] = field(default_factory=dict)
-    total_seconds: float = 0.0
-
-##############################################################################################################
-
 class AI:
     @staticmethod
     def get_e0_points(units)->int:
         score = 0
         for _,unit in units:
             if unit.is_alive():
-                if unit.unit.type == UnitType.AI:
+                if unit.type == UnitType.AI:
                     score += 9999
                 else:
                     score += 3
@@ -338,28 +330,34 @@ class AI:
         if (game.next_player == Player.Attacker):
             best_score = MIN_HEURISTIC_SCORE
             for move in moves:
-                game.perform_move(move, False)
-                (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+                is_valid, _ = game.perform_move(move, False)
+                if is_valid and move.src != move.dst:
+                    game.next_turn()
+                    (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
 
-                if score > best_score:
-                    best_score = score
-                    best_move = move
-                
-                total_depth += 1 + avg_depth
-            return best_score, best_move, total_depth / len(moves)
+                    if score > best_score:
+                        best_score = score
+                        best_move = move
+                    
+                    total_depth += 1 + avg_depth
+                    game.stats.evaluations_per_depth.update(depth=total_depth)
+            return best_score, best_move, total_depth
         else:
             best_score = MAX_HEURISTIC_SCORE
-
             for move in moves:
-                game.perform_move(move, False)
-                (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+                is_valid, _ = game.perform_move(move, False)
+                if is_valid:
+                    game.next_turn()
+                    (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
 
-                if score < best_score:
-                    best_score = score
-                    best_move = move
-                
-                total_depth += 1 + avg_depth
-            return best_score, best_move, total_depth / len(moves)
+                    if score < best_score:
+                        best_score = score
+                        best_move = move
+                    
+                    total_depth += 1 + avg_depth
+                    game.stats.evaluations_per_depth.update(depth=total_depth)
+
+            return best_score, best_move, total_depth
     
     @staticmethod
     def alpha_beta(game : Game) -> Tuple[int, CoordPair | None, float]:
@@ -478,7 +476,7 @@ class Game:
             case Player.Attacker:
                 if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
                     if self.is_in_combat(coords.src):
-                        print("The unit is in combat and can't move!")
+                        #print("The unit is in combat and can't move!")
                         return False
                     if coords.dst == coords.src.up() or coords.dst == coords.src.left():
                         return True
@@ -489,7 +487,7 @@ class Game:
             case Player.Defender:
                 if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
                     if self.is_in_combat(coords.src):
-                        print("The unit is in combat and can't move!")
+                        #print("The unit is in combat and can't move!")
                         return False
                     if coords.dst == coords.src.down() or coords.dst == coords.src.right():
                         return True
@@ -522,8 +520,8 @@ class Game:
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
-                if show_output:
-                    self.output_file_midgame(coords.src, coords.dst)
+                #if show_output:
+                    #self.output_file_midgame(coords.src, coords.dst)
                 return output
 
             if target_unit is not None:
@@ -531,12 +529,12 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
-                    if show_output:
-                        self.output_file_midgame(coords.src, coords.dst)
+                   # if show_output:
+                       # self.output_file_midgame(coords.src, coords.dst)
                     return output
                 elif target_unit.player is current_unit.player:
-                    if show_output:
-                        self.output_file_midgame(coords.src, coords.dst)
+                   # if show_output:
+                        #self.output_file_midgame(coords.src, coords.dst)
                     return current_unit.repair(target_unit)
 
             # just moving
