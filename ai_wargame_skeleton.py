@@ -300,9 +300,61 @@ class Stats:
     evaluations_per_depth: dict[int, int] = field(default_factory=dict)
     total_seconds: float = 0.0
 
+##############################################################################################################
+
+@dataclass(slots=True)
+class Stats:
+    """Representation of the global game statistics."""
+    evaluations_per_depth: dict[int, int] = field(default_factory=dict)
+    total_seconds: float = 0.0
 
 ##############################################################################################################
 
+class AI:
+    @staticmethod
+    def heuristic1()->int:
+        return 0
+
+    @staticmethod
+    def mini_max(game : Game, depth: int) -> Tuple[int, CoordPair | None, float]:
+        if game.is_finished() or depth == 0:
+            return (AI.heuristic1(), None, 0)
+
+        best_move = None
+        total_depth = 0
+        moves = game.move_candidates()
+
+        if (game.next_player == Player.Attacker):
+            best_score = MIN_HEURISTIC_SCORE
+            for move in moves:
+                game.perform_move(move, False)
+                (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                
+                total_depth += 1 + avg_depth
+            return best_score, best_move, total_depth / len(moves)
+        else:
+            best_score = MAX_HEURISTIC_SCORE
+
+            for move in moves:
+                game.perform_move(move, False)
+                (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+
+                if score < best_score:
+                    best_score = score
+                    best_move = move
+                
+                total_depth += 1 + avg_depth
+            return best_score, best_move, total_depth / 1
+    
+    @staticmethod
+    def alpha_beta(game : Game) -> Tuple[int, CoordPair | None, float]:
+        return (0, None, 0)
+
+##############################################################################################################
 @dataclass(slots=True)
 class Game:
     """Representation of the game state."""
@@ -445,18 +497,22 @@ class Game:
                 neighbors.append(neighbor)
         return neighbors
 
-    def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
+    def perform_move(self, coords: CoordPair, show_output : bool = True) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
             current_unit = self.get(coords.src)
             target_unit = self.get(coords.dst)
+
+            if current_unit is None:
+                return (False, "invalid move")
 
             if coords.src == coords.dst:
                 output = current_unit.self_destruct(self.get_adjacent_units_with_diagonals(coords.src))
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
-                self.output_file_midgame(coords.src, coords.dst)
+                if show_output:
+                    self.output_file_midgame(coords.src, coords.dst)
                 return output
 
             if target_unit is not None:
@@ -464,10 +520,12 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
-                    self.output_file_midgame(coords.src, coords.dst)
+                    if show_output:
+                        self.output_file_midgame(coords.src, coords.dst)
                     return output
                 elif target_unit.player is current_unit.player:
-                    self.output_file_midgame(coords.src, coords.dst)
+                    if show_output:
+                        self.output_file_midgame(coords.src, coords.dst)
                     return current_unit.repair(target_unit)
 
             # just moving
@@ -608,11 +666,25 @@ class Game:
             return (0, move_candidates[0], 1)
         else:
             return (0, None, 0)
+        
+    def ai_move(self) -> Tuple[int, CoordPair | None, float]:
+        move_candidates = list(self.move_candidates())
+        if len(move_candidates) > 0:
+            if self.options.alpha_beta:
+                return AI.alpha_beta(self.clone())
+            else:
+                return AI.mini_max(self.clone(), self.options.max_depth)
+        else:
+            return (0, None, 0)
 
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
-        (score, move, avg_depth) = self.random_move()
+        
+        if self.options.randomize_moves:
+            (score, move, avg_depth) = self.random_move()
+        else:
+            (score, move, avg_depth) = self.ai_move()
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
