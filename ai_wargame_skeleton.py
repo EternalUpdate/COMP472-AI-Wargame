@@ -312,13 +312,24 @@ class Stats:
 
 class AI:
     @staticmethod
-    def heuristic1()->int:
-        return 0
+    def get_e0_points(units)->int:
+        score = 0
+        for _,unit in units:
+            if unit.is_alive():
+                if unit.unit.type == UnitType.AI:
+                    score += 9999
+                else:
+                    score += 3
+        return score
+
+    @staticmethod
+    def e0(game : Game)->int:
+        return AI.get_e0_points(game.player_units(game.next_player)) - AI.get_e0_points(game.player_units(game.next_player.next()))
 
     @staticmethod
     def mini_max(game : Game, depth: int) -> Tuple[int, CoordPair | None, float]:
         if game.is_finished() or depth == 0:
-            return (AI.heuristic1(), None, 0)
+            return (AI.e0(game), None, 0)
 
         best_move = None
         total_depth = 0
@@ -348,7 +359,7 @@ class AI:
                     best_move = move
                 
                 total_depth += 1 + avg_depth
-            return best_score, best_move, total_depth / 1
+            return best_score, best_move, total_depth / len(moves)
     
     @staticmethod
     def alpha_beta(game : Game) -> Tuple[int, CoordPair | None, float]:
