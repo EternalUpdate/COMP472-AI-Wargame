@@ -113,9 +113,6 @@ class Unit:
         return (True, f"{self} attacks {target} for {self.damage_amount(target)} damage")
 
     def repair(self, target: Unit):
-        if target.health == 9:
-            return (False, "invalid move")
-
         healAmount = self.repair_amount(target)
         target.mod_health(healAmount)
 
@@ -346,7 +343,7 @@ class AI:
             best_score = MAX_HEURISTIC_SCORE
             for move in moves:
                 is_valid, _ = game.perform_move(move, False)
-                if is_valid:
+                if is_valid and move.src != move.dst:
                     game.next_turn()
                     (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
 
@@ -392,7 +389,7 @@ class AI:
             best_score = MAX_HEURISTIC_SCORE
             for move in moves:
                 is_valid, _ = game.perform_move(move, False)
-                if is_valid:
+                if is_valid and move.src != move.dst:
                     game.next_turn()
                     (score, _, avg_depth) = AI.alpha_beta(game.clone(), depth - 1, alpha, beta)
 
@@ -501,21 +498,23 @@ class Game:
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
 
-        # self-destruct
-        if coords.src == coords.dst:
-            return True
-
         current_unit = self.get(coords.src)
         target_unit = self.get(coords.dst)
 
         if current_unit is None or current_unit.player != self.next_player:
             return False
 
+        # self-destruct
+        if coords.src == coords.dst:
+            return True
+
         if not coords.src.has_adjacent(coords.dst):
             return False
 
         # attacking / repairing
         if target_unit is not None:
+            if target_unit.player == current_unit.player and target_unit.health == 9:
+                return False
             return True
 
         # moving
