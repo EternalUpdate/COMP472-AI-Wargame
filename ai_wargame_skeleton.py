@@ -313,49 +313,47 @@ class AI:
 
     @staticmethod
     def e0(game : Game)->int:
-        return AI.get_e0_points(game.player_units(game.next_player)) - AI.get_e0_points(game.player_units(game.next_player.next()))
+        return AI.get_e0_points(game.player_units(Player.Attacker)) - AI.get_e0_points(game.player_units(Player.Defender))
 
     @staticmethod
-    def mini_max(game : Game, depth: int) -> Tuple[int, CoordPair | None, float]:
+    def mini_max(game : Game, depth: int, isMaximizing: bool) -> Tuple[int, CoordPair | None, float]:
+        #recursive end condition: either we reach max depth or find a game winning move.
         if game.is_finished() or depth == 0:
             return (AI.e0(game), None, 0)
 
-        best_move = None
-        total_depth = 0
-        moves = game.move_candidates()
+        #Define Variables
+        total_depth = 0                 #total depth of search
+        moves = game.move_candidates()  #all possible moves this turn
+        best_move = None                #best possible move
+        best_score = 0                  #score associated with best move
 
-        if (game.next_player == Player.Attacker):
-            best_score = MIN_HEURISTIC_SCORE
-            for move in moves:
-                is_valid, _ = game.perform_move(move, False)
-                if is_valid and move.src != move.dst:
-                    game.next_turn()
-                    (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+        #set the best score depending on if we're maximizing or minimizing
+        if isMaximizing: best_score = MIN_HEURISTIC_SCORE 
+        else : best_score = MAX_HEURISTIC_SCORE
 
-                    if score > best_score:
-                        best_score = score
-                        best_move = move
-                    
-                    total_depth += 1 + avg_depth
-                    game.stats.evaluations_per_depth.update(depth=total_depth)
-            return best_score, best_move, total_depth
-        else:
-            best_score = MAX_HEURISTIC_SCORE
-            for move in moves:
-                is_valid, _ = game.perform_move(move, False)
-                if is_valid and move.src != move.dst:
-                    game.next_turn()
-                    (score, _, avg_depth) = AI.mini_max(game.clone(), depth -1)
+        #loop through each possible move
+        for move in moves:
+            #check for the validity of the move
+            is_valid, _ = game.perform_move(move, False)
+            if is_valid and move.src != move.dst: #temporary, (TO-DO: DELETE)
+                #progress the game
+                game_clone = game.clone()
+                game_clone.next_turn()
+                #evaluate the next series of moves
+                (score, _, avg_depth) = AI.mini_max(game.clone(), depth - 1, isMaximizing)
 
-                    if score < best_score:
-                        best_score = score
-                        best_move = move
-                    
-                    total_depth += 1 + avg_depth
-                    game.stats.evaluations_per_depth.update(depth=total_depth)
+                #update max score based on if we're maximizing or minimizing
+                if (isMaximizing and score > best_score) or (not isMaximizing and score < best_score):
+                    best_score = score
+                    best_move = move
+                
+                #update stats (still TO-DO, this is mostly garbage)
+                total_depth += 1 + avg_depth
+                game.stats.evaluations_per_depth.update(depth=total_depth)
 
-            return best_score, best_move, total_depth
-
+        #we've looped through all the moves, return the best one
+        return best_score, best_move, total_depth
+    
     @staticmethod
     def alpha_beta(game: Game, depth: int, alpha: int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE) -> Tuple[int, CoordPair | None, float]:
         if game.is_finished() or depth == 0:
@@ -728,7 +726,7 @@ class Game:
             if self.options.alpha_beta:
                 return AI.alpha_beta(self.clone(), self.options.max_depth)
             else:
-                return AI.mini_max(self.clone(), self.options.max_depth)
+                return AI.mini_max(self.clone(), self.options.max_depth, self.next_player == Player.Attacker)
         else:
             return (0, None, 0)
 
