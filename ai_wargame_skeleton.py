@@ -358,10 +358,57 @@ class AI:
                     game.stats.evaluations_per_depth.update(depth=total_depth)
 
             return best_score, best_move, total_depth
-    
+
     @staticmethod
-    def alpha_beta(game : Game) -> Tuple[int, CoordPair | None, float]:
-        return (0, None, 0)
+    def alpha_beta(game: Game, depth: int, alpha: int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE) -> Tuple[int, CoordPair | None, float]:
+        if game.is_finished() or depth == 0:
+            return AI.e0(game), None, 0
+
+        best_move = None
+        total_depth = 0
+        moves = game.move_candidates()
+
+        if game.next_player == Player.Attacker:
+            best_score = MIN_HEURISTIC_SCORE
+            for move in moves:
+                is_valid, _ = game.perform_move(move, False)
+                if is_valid and move.src != move.dst:
+                    game.next_turn()
+                    (score, _, avg_depth) = AI.alpha_beta(game.clone(), depth - 1, alpha, beta)
+
+                    if score > best_score:
+                        best_score = score
+                        best_move = move
+
+                    total_depth += 1 + avg_depth
+                    game.stats.evaluations_per_depth.update(depth=total_depth)
+
+                    alpha = max(alpha, best_score)
+                    if alpha >= beta:
+                        break  # prune
+
+            return best_score, best_move, total_depth
+        else:
+            best_score = MAX_HEURISTIC_SCORE
+            for move in moves:
+                is_valid, _ = game.perform_move(move, False)
+                if is_valid:
+                    game.next_turn()
+                    (score, _, avg_depth) = AI.alpha_beta(game.clone(), depth - 1, alpha, beta)
+
+                    if score < best_score:
+                        best_score = score
+                        best_move = move
+
+                    total_depth += 1 + avg_depth
+                    game.stats.evaluations_per_depth.update(depth=total_depth)
+
+                    beta = min(beta, best_score)
+                    if alpha >= beta:
+                        break  # prune
+
+            return best_score, best_move, total_depth
+
 
 ##############################################################################################################
 @dataclass(slots=True)
@@ -680,7 +727,7 @@ class Game:
         move_candidates = list(self.move_candidates())
         if len(move_candidates) > 0:
             if self.options.alpha_beta:
-                return AI.alpha_beta(self.clone())
+                return AI.alpha_beta(self.clone(), self.options.max_depth)
             else:
                 return AI.mini_max(self.clone(), self.options.max_depth)
         else:
@@ -852,6 +899,10 @@ def main():
 
     # create a new game
     game = Game(options=options)
+
+    # options.game_type = GameType.AttackerVsComp
+    # options.alpha_beta = True
+    # options.randomize_moves = False
 
     # the main game loop
     while True:
