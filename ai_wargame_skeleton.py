@@ -118,11 +118,12 @@ class Unit:
 
         return (True, f"{self} repairs {target} for {self.repair_amount(target)} health")
 
-    def self_destruct(self, targets : list[Unit]):
+    def self_destruct(self, targets: list[Unit]):
         for unit in targets:
             unit.mod_health(-2)
         self.mod_health(-9)
         return (True, f"{self} self-destructs")
+
 
 ##############################################################################################################
 
@@ -297,13 +298,14 @@ class Stats:
     evaluations_per_depth: dict[int, int] = field(default_factory=dict)
     total_seconds: float = 0.0
 
+
 ##############################################################################################################
 
 class AI:
     @staticmethod
-    def get_e0_points(units)->int:
+    def get_e0_points(units) -> int:
         score = 0
-        for _,unit in units:
+        for _, unit in units:
             if unit.is_alive():
                 if unit.type == UnitType.AI:
                     score += 9999
@@ -312,95 +314,102 @@ class AI:
         return score
 
     @staticmethod
-    def e0(game : Game)->int:
-        return AI.get_e0_points(game.player_units(Player.Attacker)) - AI.get_e0_points(game.player_units(Player.Defender))
+    def e0(game: Game) -> int:
+        return AI.get_e0_points(game.player_units(Player.Attacker)) - AI.get_e0_points(
+            game.player_units(Player.Defender))
 
     @staticmethod
-    def mini_max(game : Game, depth: int, isMaximizing: bool) -> Tuple[int, CoordPair | None, float]:
-        #recursive end condition: either we reach max depth or find a game winning move.
-        if game.is_finished() or depth == 0:
-            return (AI.e0(game), None, 0)
-
-        #Define Variables
-        total_depth = 0                 #total depth of search
-        moves = game.move_candidates()  #all possible moves this turn
-        best_move = None                #best possible move
-        best_score = 0                  #score associated with best move
-
-        #set the best score depending on if we're maximizing or minimizing
-        if isMaximizing: best_score = MIN_HEURISTIC_SCORE 
-        else : best_score = MAX_HEURISTIC_SCORE
-
-        #loop through each possible move
-        for move in moves:
-            #check for the validity of the move
-            is_valid, _ = game.perform_move(move, False)
-            if is_valid and move.src != move.dst: #temporary, (TO-DO: DELETE)
-                #progress the game
-                game_clone = game.clone()
-                game_clone.next_turn()
-                #evaluate the next series of moves
-                (score, _, avg_depth) = AI.mini_max(game.clone(), depth - 1, isMaximizing)
-
-                #update max score based on if we're maximizing or minimizing
-                if (isMaximizing and score > best_score) or (not isMaximizing and score < best_score):
-                    best_score = score
-                    best_move = move
-                
-                #update stats (still TO-DO, this is mostly garbage)
-                total_depth += 1 + avg_depth
-                game.stats.evaluations_per_depth.update(depth=total_depth)
-
-        #we've looped through all the moves, return the best one
-        return best_score, best_move, total_depth
-    
-    @staticmethod
-    def alpha_beta(game: Game, depth: int, alpha: int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE) -> Tuple[int, CoordPair | None, float]:
+    def mini_max(game: Game, depth: int, is_maximizing: bool) -> Tuple[int, CoordPair | None, float]:
+        # recursive end condition: either we reach max depth or find a game winning move.
         if game.is_finished() or depth == 0:
             return AI.e0(game), None, 0
 
-        best_move = None
+        # Define Variables
+        total_depth = 0  # total depth of search
+        moves = game.move_candidates()  # all possible moves this turn
+        best_move = None  # best possible move
+        best_score = 0  # score associated with best move
+
+        # set the best score depending on if we're maximizing or minimizing
+        if is_maximizing:
+            best_score = MIN_HEURISTIC_SCORE
+        else:
+            best_score = MAX_HEURISTIC_SCORE
+
+        # loop through each possible move
+        for move in moves:
+            # check for the validity of the move
+            game_clone = game.clone()
+            is_valid, _ = game_clone.perform_move(move, False)
+            if is_valid and move.src != move.dst:  # temporary, (TO-DO: DELETE)
+                # progress the game
+                game_clone.next_turn()
+                # evaluate the next series of moves
+                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, is_maximizing)
+
+                # update max score based on if we're maximizing or minimizing
+                if (is_maximizing and score > best_score) or (not is_maximizing and score < best_score):
+                    best_score = score
+                    best_move = move
+
+                # update stats (still TO-DO, this is mostly garbage)
+                total_depth += 1 + avg_depth
+                game.stats.evaluations_per_depth.update(depth=total_depth)
+
+        # we've looped through all the moves, return the best one
+        return best_score, best_move, total_depth
+
+    @staticmethod
+    def alpha_beta(game: Game, depth: int, alpha: int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE,
+                   is_maximizing: bool = True) -> Tuple[int, CoordPair | None, float]:
+        if game.is_finished() or depth == 0:
+            return AI.e0(game), None, 0
+
         total_depth = 0
         moves = game.move_candidates()
+        best_move = None
 
-        if game.next_player == Player.Attacker:
+        if is_maximizing:
             best_score = MIN_HEURISTIC_SCORE
             for move in moves:
-                is_valid, _ = game.perform_move(move, False)
+                game_clone = game.clone()
+                is_valid, _ = game_clone.perform_move(move, False)
                 if is_valid and move.src != move.dst:
-                    game.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game.clone(), depth - 1, alpha, beta)
+                    game_clone.next_turn()
+                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, alpha, beta, False)
 
                     if score > best_score:
                         best_score = score
                         best_move = move
 
-                    total_depth += 1 + avg_depth
-                    game.stats.evaluations_per_depth.update(depth=total_depth)
-
                     alpha = max(alpha, best_score)
-                    if alpha >= beta:
+                    if beta <= alpha:
                         break  # prune
 
+                    total_depth += 1 + avg_depth
+                    # Update stats if needed (TO-DO)
+
             return best_score, best_move, total_depth
+
         else:
             best_score = MAX_HEURISTIC_SCORE
             for move in moves:
-                is_valid, _ = game.perform_move(move, False)
+                game_clone = game.clone()
+                is_valid, _ = game_clone.perform_move(move, False)
                 if is_valid and move.src != move.dst:
-                    game.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game.clone(), depth - 1, alpha, beta)
+                    game_clone.next_turn()
+                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, alpha, beta, True)
 
                     if score < best_score:
                         best_score = score
                         best_move = move
 
-                    total_depth += 1 + avg_depth
-                    game.stats.evaluations_per_depth.update(depth=total_depth)
-
                     beta = min(beta, best_score)
-                    if alpha >= beta:
+                    if beta <= alpha:
                         break  # prune
+
+                    total_depth += 1 + avg_depth
+                    # Update stats if needed (TO-DO)
 
             return best_score, best_move, total_depth
 
@@ -416,7 +425,6 @@ class Game:
     stats: Stats = field(default_factory=Stats)
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
-
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -436,7 +444,6 @@ class Game:
         self.set(Coord(md, md - 2), Unit(player=Player.Attacker, type=UnitType.Program))
         self.set(Coord(md - 1, md - 1), Unit(player=Player.Attacker, type=UnitType.Firewall))
         self.output_file_initial()
-
 
     def clone(self) -> Game:
         """Make a new copy of a game for minimax recursion.
@@ -520,7 +527,7 @@ class Game:
             case Player.Attacker:
                 if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
                     if self.is_in_combat(coords.src):
-                        #print("The unit is in combat and can't move!")
+                        # print("The unit is in combat and can't move!")
                         return False
                     if coords.dst == coords.src.up() or coords.dst == coords.src.left():
                         return True
@@ -531,7 +538,7 @@ class Game:
             case Player.Defender:
                 if current_unit.type == UnitType.AI or current_unit.type == UnitType.Firewall or current_unit.type == UnitType.Program:
                     if self.is_in_combat(coords.src):
-                        #print("The unit is in combat and can't move!")
+                        # print("The unit is in combat and can't move!")
                         return False
                     if coords.dst == coords.src.down() or coords.dst == coords.src.right():
                         return True
@@ -550,8 +557,8 @@ class Game:
                 neighbors.append(neighbor)
         return neighbors
 
-    def perform_move(self, coords: CoordPair, show_output : bool = True) -> Tuple[bool, str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+    def perform_move(self, coords: CoordPair, show_output: bool = True) -> Tuple[bool, str]:
+        """Validate and perform a move expressed as a CoordPair."""
         if self.is_valid_move(coords):
             current_unit = self.get(coords.src)
             target_unit = self.get(coords.dst)
@@ -564,8 +571,8 @@ class Game:
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
-                #if show_output:
-                    #self.output_file_midgame(coords.src, coords.dst)
+                # if show_output:
+                # self.output_file_midgame(coords.src, coords.dst)
                 return output
 
             if target_unit is not None:
@@ -573,12 +580,12 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
-                   # if show_output:
-                       # self.output_file_midgame(coords.src, coords.dst)
+                    # if show_output:
+                    # self.output_file_midgame(coords.src, coords.dst)
                     return output
                 elif target_unit.player is current_unit.player:
-                   # if show_output:
-                        #self.output_file_midgame(coords.src, coords.dst)
+                    # if show_output:
+                    # self.output_file_midgame(coords.src, coords.dst)
                     return current_unit.repair(target_unit)
 
             # just moving
@@ -696,7 +703,7 @@ class Game:
             if self._defender_has_ai:
                 return None
             else:
-                return Player.Attacker    
+                return Player.Attacker
         return Player.Defender
 
     def move_candidates(self) -> Iterable[CoordPair]:
@@ -719,7 +726,7 @@ class Game:
             return (0, move_candidates[0], 1)
         else:
             return (0, None, 0)
-        
+
     def ai_move(self) -> Tuple[int, CoordPair | None, float]:
         move_candidates = list(self.move_candidates())
         if len(move_candidates) > 0:
@@ -733,7 +740,7 @@ class Game:
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
-        
+
         if self.options.randomize_moves:
             (score, move, avg_depth) = self.random_move()
         else:
@@ -812,11 +819,11 @@ class Game:
                 l2 = f"The max number of turns is: {m} \n"
                 l3 = f"Alpha-Beta enabled?: {b} \n"
                 l4 = f"Play mode is: {self.options.game_type}\n"
-                #add heuristic to options
-                #l5 = f"Heuristic used {self.options.heuristic}\n"
+                # add heuristic to options
+                # l5 = f"Heuristic used {self.options.heuristic}\n"
                 l6 = f"Initial configuration\n"
                 l7 = f"{Game.to_string(self)}"
-                file.writelines([l1, l2, l3, l4,l6,l7])
+                file.writelines([l1, l2, l3, l4, l6, l7])
         except IOError as e:
             print(f"Error: {e}")
 
@@ -830,7 +837,8 @@ class Game:
         l1 = f"Turn: {self.turns_played}\n"
         l2 = f"Current Player: {self.next_player.name} \n"
         l3 = f"Moved from: {src} to: {dst}\n"
-        if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker) :
+        if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (
+                self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker):
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
             l5 = ""
 
@@ -850,6 +858,7 @@ class Game:
                 file.writelines([l1, l2, l3, l4, l5, l6, l7, l8, l9, l10])
         except IOError as e:
             print(f"Error: {e}")
+
     def output_file_endgame(self):
         b = self.options.alpha_beta
         t = self.options.max_time
@@ -860,6 +869,8 @@ class Game:
                 file.writelines(f"{self.has_winner()} wins in {self.turns_played} turns")
         except IOError as e:
             print(f"Error: {e}")
+
+
 ##############################################################################################################
 
 def main():
@@ -897,7 +908,7 @@ def main():
     # create a new game
     game = Game(options=options)
 
-    # options.game_type = GameType.AttackerVsComp
+    # options.game_type = GameType.CompVsComp
     # options.alpha_beta = True
     # options.randomize_moves = False
 
