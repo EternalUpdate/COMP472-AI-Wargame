@@ -258,6 +258,11 @@ class CoordPair:
         return CoordPair(Coord(0, 0), Coord(dim - 1, dim - 1))
 
     @classmethod
+    def distance(cls, src: Coord, dst: Coord) -> int:
+        """Calculate the distance between two Coords."""
+        return abs(src.row - dst.row) + abs(src.col - dst.col)
+
+    @classmethod
     def from_string(cls, s: str) -> CoordPair | None:
         """Create a CoordPair from a string. ex: A3 B2"""
         s = s.strip()
@@ -317,6 +322,30 @@ class AI:
     def e0(game: Game) -> int:
         return AI.get_e0_points(game.player_units(Player.Attacker)) - AI.get_e0_points(
             game.player_units(Player.Defender))
+
+    @staticmethod
+    def proximity_score(game: Game, player_coord: Coord, enemy_units: Iterable[tuple[Coord, Unit]]):
+        """Calculates a score for a player unit at a given coordinate to enemy units
+        based on the proximity and damage potential to the enemy's units."""
+        score = 0
+        player_unit = game.get(player_coord)
+        for enemy_coord, enemy_unit in enemy_units:
+            distance = CoordPair.distance(player_coord, enemy_coord)
+            score += player_unit.damage_amount(enemy_unit) / distance
+
+        return score
+
+    @staticmethod
+    def e1(game: Game):
+        """Heuristic that calculates the score of the game
+        based on the proximity of the player's units to the enemy's units."""
+        attacker_units = game.player_units(Player.Attacker)
+        defender_units = game.player_units(Player.Defender)
+
+        attacker_score = sum(AI.proximity_score(game, coord, defender_units) for coord, _ in attacker_units)
+        defender_score = sum(AI.proximity_score(game, coord, attacker_units) for coord, _ in defender_units)
+
+        return attacker_score - defender_score
 
     @staticmethod
     def mini_max(game: Game, depth: int, is_maximizing: bool) -> Tuple[int, CoordPair | None, float]:
