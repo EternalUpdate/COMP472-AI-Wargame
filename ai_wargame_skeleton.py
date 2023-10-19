@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
 from time import sleep
-from typing import Tuple, TypeVar, Type, Iterable, ClassVar
+from typing import Tuple, TypeVar, Type, Iterable, ClassVar, Callable
 import random
 import requests
 
@@ -282,26 +282,18 @@ class CoordPair:
 ##############################################################################################################
 
 @dataclass(slots=True)
-class Options:
-    """Representation of the game options."""
-    dim: int = 5
-    max_depth: int | None = 4
-    min_depth: int | None = 2
-    max_time: float | None = 5.0
-    game_type: GameType = GameType.AttackerVsDefender
-    alpha_beta: bool = True
-    max_turns: int | None = 100
-    randomize_moves: bool = True
-    broker: str | None = None
-
-
-##############################################################################################################
-
-@dataclass(slots=True)
 class Stats:
     """Representation of the global game statistics."""
     evaluations_per_depth: dict[int, int] = field(default_factory=dict)
     total_seconds: float = 0.0
+
+
+##############################################################################################################
+
+class Heuristic(Enum):
+    e0 = "e0"
+    e1 = "e1"
+    e2 = "e2"
 
 
 ##############################################################################################################
@@ -331,27 +323,57 @@ class AI:
         player_unit = game.get(player_coord)
         for enemy_coord, enemy_unit in enemy_units:
             distance = CoordPair.distance(player_coord, enemy_coord)
-            score += player_unit.damage_amount(enemy_unit) / distance
+            damage_amount = player_unit.damage_amount(enemy_unit)
+
+            # extra points if a Tech unit is close to the enemy AI
+            if player_unit.type == UnitType.Tech and enemy_unit.type == UnitType.AI:
+                score += 2 * damage_amount / distance
+            else:
+                score += damage_amount / distance
 
         return score
 
     @staticmethod
-    def e1(game: Game):
+    def health_score(enemy_units: Iterable[tuple[Coord, Unit]]):
+        """Calculates a score based on the enemy units' health."""
+        score = 0
+        for _, unit in enemy_units:
+            score -= unit.health
+        return score
+
+    @staticmethod
+    def e1(game: Game) -> int:
         """Heuristic that calculates the score of the game
-        based on the proximity of the player's units to the enemy's units."""
+        based on the proximity of the player's units to the enemy's units and the health of enemy units."""
         attacker_units = game.player_units(Player.Attacker)
         defender_units = game.player_units(Player.Defender)
 
-        attacker_score = sum(AI.proximity_score(game, coord, defender_units) for coord, _ in attacker_units)
-        defender_score = sum(AI.proximity_score(game, coord, attacker_units) for coord, _ in defender_units)
+        attacker_score = AI.health_score(defender_units)
+        defender_score = AI.health_score(attacker_units)
 
         return attacker_score - defender_score
 
     @staticmethod
-    def mini_max(game: Game, depth: int, is_maximizing: bool) -> Tuple[int, CoordPair | None, float]:
+    def e2(game: Game) -> int:
+        return None
+
+    @staticmethod
+    def call_heuristic(heuristic: Heuristic, game: Game) -> int:
+        """Calls the heuristic function based on the enum value."""
+        match heuristic:
+            case Heuristic.e0:
+                return AI.e0(game)
+            case Heuristic.e1:
+                return AI.e1(game)
+            case Heuristic.e2:
+                return AI.e2(game)
+
+    @staticmethod
+    def mini_max(game: Game, depth: int, is_maximizing: bool, heuristic: Heuristic) \
+            -> Tuple[int, CoordPair | None, float]:
         # recursive end condition: either we reach max depth or find a game winning move.
         if game.is_finished() or depth == 0:
-            return AI.e0(game), None, 0
+            return AI.call_heuristic(heuristic, game), None, 0
 
         # Define Variables
         total_depth = 0  # total depth of search
@@ -374,7 +396,7 @@ class AI:
                 # progress the game
                 game_clone.next_turn()
                 # evaluate the next series of moves
-                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, is_maximizing)
+                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, is_maximizing, heuristic)
 
                 # update max score based on if we're maximizing or minimizing
                 if (is_maximizing and score > best_score) or (not is_maximizing and score < best_score):
@@ -389,10 +411,11 @@ class AI:
         return best_score, best_move, total_depth
 
     @staticmethod
-    def alpha_beta(game: Game, depth: int, alpha: int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE,
+    def alpha_beta(game: Game, depth: int, heuristic: Heuristic, alpha: int = MIN_HEURISTIC_SCORE,
+                   beta: int = MAX_HEURISTIC_SCORE,
                    is_maximizing: bool = True) -> Tuple[int, CoordPair | None, float]:
         if game.is_finished() or depth == 0:
-            return AI.e0(game), None, 0
+            return AI.call_heuristic(heuristic, game), None, 0
 
         total_depth = 0
         moves = game.move_candidates()
@@ -405,7 +428,7 @@ class AI:
                 is_valid, _ = game_clone.perform_move(move, False)
                 if is_valid and move.src != move.dst:
                     game_clone.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, alpha, beta, False)
+                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, alpha, beta, False)
 
                     if score > best_score:
                         best_score = score
@@ -427,7 +450,7 @@ class AI:
                 is_valid, _ = game_clone.perform_move(move, False)
                 if is_valid and move.src != move.dst:
                     game_clone.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, alpha, beta, True)
+                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, alpha, beta, True)
 
                     if score < best_score:
                         best_score = score
@@ -441,6 +464,23 @@ class AI:
                     # Update stats if needed (TO-DO)
 
             return best_score, best_move, total_depth
+
+
+##############################################################################################################
+
+@dataclass(slots=True)
+class Options:
+    """Representation of the game options."""
+    dim: int = 5
+    max_depth: int | None = 4
+    min_depth: int | None = 2
+    max_time: float | None = 5.0
+    game_type: GameType = GameType.AttackerVsDefender
+    alpha_beta: bool = True
+    max_turns: int | None = 100
+    randomize_moves: bool = True
+    broker: str | None = None
+    heuristic: Heuristic = Heuristic.e0
 
 
 ##############################################################################################################
@@ -528,7 +568,7 @@ class Game:
             self.remove_dead(coord)
 
     def is_valid_move(self, coords: CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate a move expressed as a CoordPair."""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
 
@@ -539,7 +579,7 @@ class Game:
             return False
 
         # self-destruct
-        if coords.src == coords.dst:
+        if coords.src == coords.dst and current_unit.player == target_unit.player:
             return True
 
         if not coords.src.has_adjacent(coords.dst):
@@ -718,7 +758,7 @@ class Game:
         for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
             unit = self.get(coord)
             if unit is not None and unit.player == player:
-                yield (coord, unit)
+                yield coord, unit
 
     def is_finished(self) -> bool:
         """Check if the game is over."""
@@ -752,22 +792,23 @@ class Game:
         move_candidates = list(self.move_candidates())
         random.shuffle(move_candidates)
         if len(move_candidates) > 0:
-            return (0, move_candidates[0], 1)
+            return 0, move_candidates[0], 1
         else:
-            return (0, None, 0)
+            return 0, None, 0
 
     def ai_move(self) -> Tuple[int, CoordPair | None, float]:
         move_candidates = list(self.move_candidates())
         if len(move_candidates) > 0:
             if self.options.alpha_beta:
-                return AI.alpha_beta(self.clone(), self.options.max_depth)
+                return AI.alpha_beta(self.clone(), self.options.max_depth, self.options.heuristic)
             else:
-                return AI.mini_max(self.clone(), self.options.max_depth, self.next_player == Player.Attacker)
+                return AI.mini_max(self.clone(), self.options.max_depth, self.next_player == Player.Attacker,
+                                   self.options.heuristic)
         else:
-            return (0, None, 0)
+            return 0, None, 0
 
     def suggest_move(self) -> CoordPair | None:
-        """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
+        """Suggest the next move using minimax alpha beta."""
         start_time = datetime.now()
 
         if self.options.randomize_moves:
@@ -940,6 +981,7 @@ def main():
     # options.game_type = GameType.CompVsComp
     # options.alpha_beta = True
     # options.randomize_moves = False
+    # options.heuristic = Heuristic.e1
 
     # the main game loop
     while True:
