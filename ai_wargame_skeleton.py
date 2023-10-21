@@ -300,20 +300,19 @@ class Heuristic(Enum):
 
 class AI:
     @staticmethod
-    def get_e0_points(units) -> int:
-        score = 0
-        for _, unit in units:
-            if unit.is_alive():
-                if unit.type == UnitType.AI:
-                    score += 9999
-                else:
-                    score += 3
-        return score
-
-    @staticmethod
     def e0(game: Game) -> int:
-        return AI.get_e0_points(game.player_units(Player.Attacker)) - AI.get_e0_points(
-            game.player_units(Player.Defender))
+        pos : int = 0
+        neg : int = 0
+        for coord in CoordPair.from_dim(game.options.dim).iter_rectangle():
+            unit = game.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker:
+                    if unit.type == UnitType.AI: pos += 9999
+                    else: pos += 3
+                else:
+                    if unit.type == UnitType.AI: neg += 9999
+                    else: neg += 3
+        return pos - neg
 
     @staticmethod
     def proximity_score(game: Game, player_coord: Coord, enemy_units: Iterable[tuple[Coord, Unit]]):
@@ -369,7 +368,7 @@ class AI:
                 return AI.e2(game)
 
     @staticmethod
-    def mini_max(game: Game, depth: int, is_maximizing: bool, heuristic: Heuristic) \
+    def mini_max(game: Game, depth: int,  heuristic: Heuristic, is_maximizing: bool = True) \
             -> Tuple[int, CoordPair | None, float]:
         # recursive end condition: either we reach max depth or find a game winning move.
         if game.is_finished() or depth == 0:
@@ -392,11 +391,11 @@ class AI:
             # check for the validity of the move
             game_clone = game.clone()
             is_valid, _ = game_clone.perform_move(move, False)
-            if is_valid and move.src != move.dst:  # temporary, (TO-DO: DELETE)
+            if is_valid:
                 # progress the game
                 game_clone.next_turn()
                 # evaluate the next series of moves
-                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, is_maximizing, heuristic)
+                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, heuristic, not is_maximizing)
 
                 # update max score based on if we're maximizing or minimizing
                 if (is_maximizing and score > best_score) or (not is_maximizing and score < best_score):
@@ -404,66 +403,63 @@ class AI:
                     best_move = move
 
                 # update stats (still TO-DO, this is mostly garbage)
-                total_depth += 1 + avg_depth
+                total_depth += avg_depth + 1
                 game.stats.evaluations_per_depth.update(depth=total_depth)
 
         # we've looped through all the moves, return the best one
         return best_score, best_move, total_depth
 
     @staticmethod
-    def alpha_beta(game: Game, depth: int, heuristic: Heuristic, alpha: int = MIN_HEURISTIC_SCORE,
-                   beta: int = MAX_HEURISTIC_SCORE,
-                   is_maximizing: bool = True) -> Tuple[int, CoordPair | None, float]:
+    def alpha_beta(game: Game, depth: int,  heuristic: Heuristic,  is_maximizing: bool = True, alpha :int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE) \
+            -> Tuple[int, CoordPair | None, float]:
+        # recursive end condition: either we reach max depth or find a game winning move.
         if game.is_finished() or depth == 0:
             return AI.call_heuristic(heuristic, game), None, 0
 
-        total_depth = 0
-        moves = game.move_candidates()
-        best_move = None
+        # Define Variables
+        total_depth = 0  # total depth of search
+        moves = game.move_candidates()  # all possible moves this turn
+        best_move = None  # best possible move
+        best_score = 0  # score associated with best move
 
+        # set the best score depending on if we're maximizing or minimizing
         if is_maximizing:
             best_score = MIN_HEURISTIC_SCORE
-            for move in moves:
-                game_clone = game.clone()
-                is_valid, _ = game_clone.perform_move(move, False)
-                if is_valid and move.src != move.dst:
-                    game_clone.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, alpha, beta, False)
+        else:
+            best_score = MAX_HEURISTIC_SCORE
 
+        # loop through each possible move
+        for move in moves:
+            # check for the validity of the move
+            game_clone = game.clone()
+            is_valid, _ = game_clone.perform_move(move, False)
+            if is_valid:
+                # progress the game
+                game_clone.next_turn()
+                # evaluate the next series of moves
+                (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, not is_maximizing, alpha, beta)
+
+                # update max score based on if we're maximizing or minimizing
+                if is_maximizing:
+                    alpha = max(alpha, best_score)
                     if score > best_score:
                         best_score = score
                         best_move = move
-
-                    alpha = max(alpha, best_score)
-                    if beta <= alpha:
-                        break  # prune
-
-                    total_depth += 1 + avg_depth
-                    # Update stats if needed (TO-DO)
-
-            return best_score, best_move, total_depth
-
-        else:
-            best_score = MAX_HEURISTIC_SCORE
-            for move in moves:
-                game_clone = game.clone()
-                is_valid, _ = game_clone.perform_move(move, False)
-                if is_valid and move.src != move.dst:
-                    game_clone.next_turn()
-                    (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, alpha, beta, True)
-
+                else:
+                    beta = min(beta, best_score)
                     if score < best_score:
                         best_score = score
                         best_move = move
 
-                    beta = min(beta, best_score)
-                    if beta <= alpha:
-                        break  # prune
+                if beta <= alpha:
+                    break  # prune
 
-                    total_depth += 1 + avg_depth
-                    # Update stats if needed (TO-DO)
+                # update stats (still TO-DO, this is mostly garbage)
+                total_depth += avg_depth + 1
+                game.stats.evaluations_per_depth.update(depth=total_depth)
 
-            return best_score, best_move, total_depth
+        # we've looped through all the moves, return the best one
+        return best_score, best_move, total_depth
 
 
 ##############################################################################################################
@@ -800,10 +796,9 @@ class Game:
         move_candidates = list(self.move_candidates())
         if len(move_candidates) > 0:
             if self.options.alpha_beta:
-                return AI.alpha_beta(self.clone(), self.options.max_depth, self.options.heuristic)
+                return AI.alpha_beta(self.clone(), self.options.max_depth, self.options.heuristic, self.next_player == Player.Attacker)
             else:
-                return AI.mini_max(self.clone(), self.options.max_depth, self.next_player == Player.Attacker,
-                                   self.options.heuristic)
+                return AI.mini_max(self.clone(), self.options.max_depth, self.options.heuristic, self.next_player == Player.Attacker)
         else:
             return 0, None, 0
 
@@ -978,10 +973,11 @@ def main():
     # create a new game
     game = Game(options=options)
 
-    # options.game_type = GameType.CompVsComp
-    # options.alpha_beta = True
-    # options.randomize_moves = False
-    # options.heuristic = Heuristic.e1
+    options.game_type = GameType.CompVsComp
+    options.alpha_beta = True
+    options.max_depth = 4
+    options.randomize_moves = False
+    options.heuristic = Heuristic.e0
 
     # the main game loop
     while True:
