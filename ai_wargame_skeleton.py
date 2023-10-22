@@ -683,7 +683,7 @@ class Game:
                 neighbors.append(neighbor)
         return neighbors
 
-    def perform_move(self, coords: CoordPair, is_simulation: bool = False) -> Tuple[bool, str]:
+    def perform_move(self, coords: CoordPair, is_real_move: bool = False, score: int = 0) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         if self.is_valid_move(coords):
             current_unit = self.get(coords.src)
@@ -697,8 +697,8 @@ class Game:
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
-                if (is_simulation == True):
-                    self.output_file_midgame(output[1])
+                if (is_real_move == True):
+                    self.output_file_midgame(output[1], score)
                 return output
 
             if target_unit is not None:
@@ -706,13 +706,13 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
-                    if (is_simulation == True):
-                        self.output_file_midgame(output[1])
+                    if (is_real_move == True):
+                        self.output_file_midgame(output[1], score)
                     return output
                 elif target_unit.player is current_unit.player:
                     output = current_unit.repair(target_unit)
-                    if (is_simulation == True):
-                        self.output_file_midgame(output[1])
+                    if (is_real_move == True):
+                        self.output_file_midgame(output[1], score)
                     return output
 
             # just moving
@@ -721,8 +721,8 @@ class Game:
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
             output = f"Moved from: {self.get(coords.src)} to: {self.get(coords.dst)}\n"
-            if (is_simulation == True):
-                self.output_file_midgame(output)
+            if (is_real_move == True):
+                self.output_file_midgame(output, score)
             return (True, "")
         return (False, "invalid move")
 
@@ -807,9 +807,9 @@ class Game:
 
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
-        mv = self.suggest_move()
+        mv, score = self.suggest_move()
         if mv is not None:
-            (success, result) = self.perform_move(mv, True)
+            (success, result) = self.perform_move(mv, True, score)
             if success:
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
@@ -889,7 +889,7 @@ class Game:
         if self.stats.total_seconds > 0:
             print(f"Eval perf.: {total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
-        return move
+        return move, score
 
     def post_move_to_broker(self, move: CoordPair):
         """Send a move to the game broker."""
@@ -951,15 +951,14 @@ class Game:
                 l2 = f"The max number of turns is: {m} \n"
                 l3 = f"Alpha-Beta enabled?: {b} \n"
                 l4 = f"Play mode is: {self.options.game_type}\n"
-                # add heuristic to options
-                # l5 = f"Heuristic used {self.options.heuristic}\n"
+                l5 = f"Heuristic used {self.options.heuristic}\n"
                 l6 = f"Initial configuration\n"
                 l7 = f"{Game.to_string(self)}"
-                file.writelines([l1, l2, l3, l4, l6, l7])
+                file.writelines([l1, l2, l3, l4, l5, l6, l7])
         except IOError as e:
             print(f"Error: {e}")
 
-    def output_file_midgame(self, output):
+    def output_file_midgame(self, output, score):
         b = self.options.alpha_beta
         t = self.options.max_time
         m = self.options.max_turns
@@ -968,23 +967,22 @@ class Game:
         depthEvalPercent = ""
         l1 = f"Turn: {self.turns_played}\n"
         l2 = f"Current Player: {self.next_player.name} \n"
-        l3 = f"Move:{output} \n"
+        l3 = f"Action Taken:{output} \n"
         if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (
-                self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker):
+                self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker) or (
+                self.options.game_type == GameType.CompVsComp):
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
-            l5 = ""
-
-            # l5 = f"Heuristic score: {score}\n"
+            l5 = f"Heuristic score: {score}\n"
             l6 = f"The number of states evaluated since the beginning of the game: {sum(self.stats.evaluations_per_depth.values())} \n"
             for k in sorted(self.stats.evaluations_per_depth.keys()):
-                depthEval += f"Depth: {k} has cumulative evals: {self.stats.evaluations_per_depth[k]}, \n"
-                depthEvalPercent += f"Dept: {k} has {self.stats.evaluations_per_depth[k] / sum(self.stats.evaluations_per_depth.values())}% \n"
-            l7 = "The number of states evaluated by depth: \n " + depthEval
-            l8 = "The cumulative evals by depth in Percentage: {} \n" + depthEvalPercent
-            l9 = f"Average Branching factor: {sum(self.stats.evaluations_per_depth.values()) / len(self.stats.evaluations_per_depth)}"
+                depthEval += f"{k} has cumulative evals: {self.stats.evaluations_per_depth[k]}, \n"
+                depthEvalPercent += f"{k} has {self.stats.evaluations_per_depth[k] / sum(self.stats.evaluations_per_depth.values())}% \n"
+            l7 = "The number of states evaluated by depth: " + depthEval
+            l8 = "The cumulative evals by depth in Percentage: " + depthEvalPercent
+            l9 = f"Average Branching factor: {sum(self.stats.evaluations_per_depth.values()) / len(self.stats.evaluations_per_depth)} \n"
         else:
-            l10 = f"{Game.to_string(self)}"
             l4, l5, l6, l7, l8, l9 = "", "", "", "", "", ""
+        l10 = f"{Game.to_string(self)}"
         try:
             with open(file_name, "a") as file:
                 file.writelines([l1, l2, l3, l4, l5, l6, l7, l8, l9, l10])
@@ -1043,7 +1041,7 @@ def main():
     options.alpha_beta = True
     options.randomize_moves = False
     options.heuristic = Heuristic.e2
-
+    game.output_file_initial()
     # the main game loop
     while True:
         print()

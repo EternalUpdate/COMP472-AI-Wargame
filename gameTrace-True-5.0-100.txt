@@ -1,7 +1,8 @@
 The value of the timeout in seconds is: 5.0 
 The max number of turns is: 100 
 Alpha-Beta enabled?: True 
-Play mode is: GameType.AttackerVsDefender
+Play mode is: GameType.CompVsComp
+Heuristic used Heuristic.e2
 Initial configuration
 Next player: Attacker
 Turns played: 0
@@ -14,25 +15,81 @@ D:  .   .   .  aF9 aV9
 E:  .   .  aP9 aV9 aA9 
 Turn: 0
 Current Player: Attacker 
-Moved from: D3 to: D3
+Move:Moved from: None to: aP9
+ 
+Time for this action: 1.19214 
+Heuristic score: -25.35000000000001
+The number of states evaluated since the beginning of the game: 2304 
+The number of states evaluated by depth: depth has cumulative evals: 2304, 
+The cumulative evals by depth in Percentage: 
+depth has 1.0% 
+Average Branching factor: 2304.0 
 Next player: Attacker
 Turns played: 0
 
     0   1   2   3   4  
 A: dA9 dT9 dF9  .   .  
-B: dT9 dP9  .   .   .  
-C: dF9  .   .   .  aP9 
-D:  .   .   .   .  aV9 
+B: dT9 dP9  .   .  aP9 
+C: dF9  .   .   .   .  
+D:  .   .   .  aF9 aV9 
 E:  .   .  aP9 aV9 aA9 
 Turn: 1
 Current Player: Defender 
-Moved from: E4 to: E4
+Move:Moved from: None to: dF9
+ 
+Time for this action: 2.060682 
+Heuristic score: -24.35000000000001
+The number of states evaluated since the beginning of the game: 1839 
+The number of states evaluated by depth: depth has cumulative evals: 1839, 
+The cumulative evals by depth in Percentage: 
+depth has 1.0% 
+Average Branching factor: 1839.0 
 Next player: Defender
 Turns played: 1
 
     0   1   2   3   4  
-A: dA9 dT9 dF9  .   .  
-B: dT9 dP9  .   .   .  
-C: dF9  .   .   .  aP9 
-D:  .   .   .   .  aV9 
-E:  .   .  aP9 aV9  .  
+A: dA9 dT9  .   .   .  
+B: dT9 dP9 dF9  .  aP9 
+C: dF9  .   .   .   .  
+D:  .   .   .  aF9 aV9 
+E:  .   .  aP9 aV9 aA9 
+Turn: 2
+Current Player: Attacker 
+Move:Moved from: None to: aP9
+ 
+Time for this action: 2.975621 
+Heuristic score: -25.299999999999997
+The number of states evaluated since the beginning of the game: 1257 
+The number of states evaluated by depth: depth has cumulative evals: 1257, 
+The cumulative evals by depth in Percentage: 
+depth has 1.0% 
+Average Branching factor: 1257.0 
+Next player: Attacker
+Turns played: 2
+
+    0   1   2   3   4  
+A: dA9 dT9  .   .   .  
+B: dT9 dP9 dF9 aP9  .  
+C: dF9  .   .   .   .  
+D:  .   .   .  aF9 aV9 
+E:  .   .  aP9 aV9 aA9 
+Turn: 3
+Current Player: Defender 
+Move:Moved from: None to: dT9
+ 
+Time for this action: 3.502763 
+Heuristic score: -24.299999999999997
+The number of states evaluated since the beginning of the game: 955 
+The number of states evaluated by depth: depth has cumulative evals: 955, 
+The cumulative evals by depth in Percentage: 
+depth has 1.0% 
+Average Branching factor: 955.0 
+Next player: Defender
+Turns played: 3
+
+    0   1   2   3   4  
+A: dA9  .  dT9  .   .  
+B: dT9 dP9 dF9 aP9  .  
+C: dF9  .   .   .   .  
+D:  .   .   .  aF9 aV9 
+E:  .   .  aP9 aV9 aA9 
