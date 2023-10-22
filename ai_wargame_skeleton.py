@@ -974,13 +974,15 @@ class Game:
             l5 = f"Heuristic score: {score}\n"
 
             for k in sorted(self.stats.evaluations_per_depth.keys()):
-                self.stats.cumulative_eval_per_depth[k] = self.stats.evaluations_per_depth.get(k,0)
-                depthEval += f"{k} has cumulative evals: {self.stats.cumulative_eval_per_depth[k]}, \n"
-                depthEvalPercent += f"{k} has {self.stats.cumulative_eval_per_depth[k] / sum(self.stats.cumulative_eval_per_depth.values())}% \n"
-            l6 = f"The number of states evaluated since the beginning of the game: {self.stats.cumulative_eval_per_depth} \n"
-            l7 = "The number of states evaluated by depth: " + depthEval
-            l8 = "The cumulative evals by depth in Percentage: " + depthEvalPercent
-            l9 = f"Average Branching factor: {sum(self.stats.evaluations_per_depth.values()) / len(self.stats.evaluations_per_depth)} \n"
+                self.stats.cumulative_eval_per_depth[k] =+ self.stats.evaluations_per_depth.get(k,0)
+                depthEval += f"Depth level {k} has cumulative evals: {self.stats.cumulative_eval_per_depth[k]}, \n"
+                depthEvalPercent += f"Depth level {k} has {self.stats.cumulative_eval_per_depth[k] / sum(self.stats.cumulative_eval_per_depth.values())*100}% of states\n"
+            l6 = f"The number of states evaluated since the beginning of the game: {sum(self.stats.cumulative_eval_per_depth.values())} \n"
+            l7 = "The number of states evaluated by depth: \n" + depthEval
+            l8 = "The cumulative evals by depth in Percentage: \n" + depthEvalPercent
+            values = list(self.stats.cumulative_eval_per_depth.values())
+            total_non_leaf_nodes = sum(values[:-1]) #exclude the last depth level (leaf nodes)
+            l9 = f"Average Branching factor: {sum(self.stats.cumulative_eval_per_depth.values()) / total_non_leaf_nodes} \n"
         else:
             l4, l5, l6, l7, l8, l9 = "", "", "", "", "", ""
         l10 = f"{Game.to_string(self)}"
@@ -1039,7 +1041,7 @@ def main():
     # create a new game
     game = Game(options=options)
     options.game_type = GameType.CompVsComp
-    options.alpha_beta = True
+    options.alpha_beta = False
     options.randomize_moves = False
     options.heuristic = Heuristic.e2
     game.output_file_initial()
