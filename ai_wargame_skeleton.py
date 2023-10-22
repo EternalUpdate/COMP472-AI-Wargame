@@ -316,17 +316,21 @@ class AI:
 
     @staticmethod
     def proximity_score(game: Game, player_coord: Coord, enemy_units: Iterable[tuple[Coord, Unit]]):
-        """Calculates a score for a player unit at a given coordinate to enemy units
-        based on the proximity and damage potential to the enemy's units."""
+        """Encourage getting closer to units you have favorable match-up over"""
         score = 0
         player_unit = game.get(player_coord)
+        # Firewall board control is priority
+        if player_unit.type == UnitType.Firewall:
+            distance = CoordPair.distance(player_coord, Coord(2, 2))
+            score += 100 / distance + 1
         for enemy_coord, enemy_unit in enemy_units:
             distance = CoordPair.distance(player_coord, enemy_coord)
             damage_amount = player_unit.damage_amount(enemy_unit)
-
+            if (player_unit.type == UnitType.Virus and enemy_unit.type == UnitType.AI):
+                score += 4 * damage_amount / distance + 1
             # extra points if a Tech unit is close to the enemy AI
-            if player_unit.type == UnitType.Tech and enemy_unit.type == UnitType.AI:
-                score += 2 * damage_amount / distance
+            if player_unit.type == UnitType.Virus and enemy_unit.type == UnitType.Tech:
+                score += 2 * damage_amount / distance + 1
             else:
                 score += damage_amount / distance
 
@@ -352,9 +356,7 @@ class AI:
 
         return attacker_score - defender_score
 
-    @staticmethod
-    def e2(game: Game) -> int:
-        return None
+   
 
     @staticmethod
     def call_heuristic(heuristic: Heuristic, game: Game) -> int:
@@ -508,7 +510,7 @@ class Game:
         self.set(Coord(md - 2, md), Unit(player=Player.Attacker, type=UnitType.Program))
         self.set(Coord(md, md - 2), Unit(player=Player.Attacker, type=UnitType.Program))
         self.set(Coord(md - 1, md - 1), Unit(player=Player.Attacker, type=UnitType.Firewall))
-        self.output_file_initial()
+
 
     def clone(self) -> Game:
         """Make a new copy of a game for minimax recursion.
@@ -622,7 +624,7 @@ class Game:
                 neighbors.append(neighbor)
         return neighbors
 
-    def perform_move(self, coords: CoordPair, show_output: bool = True) -> Tuple[bool, str]:
+    def perform_move(self, coords: CoordPair, is_simulation: bool = False) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         if self.is_valid_move(coords):
             current_unit = self.get(coords.src)
@@ -636,8 +638,8 @@ class Game:
                 for cell in coords.src.iter_adjacent_with_diagonals():
                     self.remove_dead(cell)
                 self.remove_dead(coords.src)
-                # if show_output:
-                # self.output_file_midgame(coords.src, coords.dst)
+                if (is_simulation == True):
+                    self.output_file_midgame(output[1])
                 return output
 
             if target_unit is not None:
@@ -645,17 +647,23 @@ class Game:
                     output = current_unit.attack(target_unit)
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
-                    # if show_output:
-                    # self.output_file_midgame(coords.src, coords.dst)
+                    if (is_simulation == True):
+                        self.output_file_midgame(output[1])
                     return output
                 elif target_unit.player is current_unit.player:
-                    # if show_output:
-                    # self.output_file_midgame(coords.src, coords.dst)
-                    return current_unit.repair(target_unit)
+                    output = current_unit.repair(target_unit)
+                    if (is_simulation == True):
+                        self.output_file_midgame(output[1])
+                    return output
 
             # just moving
+
+
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
+            output = f"Moved from: {self.get(coords.src)} to: {self.get(coords.dst)}\n"
+            if (is_simulation == True):
+                self.output_file_midgame(output)
             return (True, "")
         return (False, "invalid move")
 
@@ -719,7 +727,7 @@ class Game:
             while True:
                 mv = self.get_move_from_broker()
                 if mv is not None:
-                    (success, result) = self.perform_move(mv)
+                    (success, result) = self.perform_move(mv, True)
                     print(f"Broker {self.next_player.name}: ", end='')
                     print(result)
                     if success:
@@ -729,7 +737,7 @@ class Game:
         else:
             while True:
                 mv = self.read_move()
-                (success, result) = self.perform_move(mv)
+                (success, result) = self.perform_move(mv, True)
                 if success:
                     print(f"Player {self.next_player.name}: ", end='')
                     print(result)
@@ -742,7 +750,7 @@ class Game:
         """Computer plays a move."""
         mv = self.suggest_move()
         if mv is not None:
-            (success, result) = self.perform_move(mv)
+            (success, result) = self.perform_move(mv, True)
             if success:
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
@@ -892,7 +900,7 @@ class Game:
         except IOError as e:
             print(f"Error: {e}")
 
-    def output_file_midgame(self, src, dst):
+    def output_file_midgame(self, output):
         b = self.options.alpha_beta
         t = self.options.max_time
         m = self.options.max_turns
@@ -901,7 +909,7 @@ class Game:
         depthEvalPercent = ""
         l1 = f"Turn: {self.turns_played}\n"
         l2 = f"Current Player: {self.next_player.name} \n"
-        l3 = f"Moved from: {src} to: {dst}\n"
+        l3 = f"Move:{output} \n"
         if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (
                 self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker):
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
@@ -972,13 +980,12 @@ def main():
 
     # create a new game
     game = Game(options=options)
-
     options.game_type = GameType.CompVsComp
-    options.alpha_beta = True
+    options.alpha_beta = False
     options.max_depth = 4
     options.randomize_moves = False
     options.heuristic = Heuristic.e0
-
+    game.output_file_initial()
     # the main game loop
     while True:
         print()
