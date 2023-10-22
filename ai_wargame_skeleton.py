@@ -285,6 +285,7 @@ class CoordPair:
 class Stats:
     """Representation of the global game statistics."""
     evaluations_per_depth: dict[int, int] = field(default_factory=dict)
+    start_time: float = 0.0
     total_seconds: float = 0.0
 
 
@@ -356,7 +357,59 @@ class AI:
 
         return attacker_score - defender_score
 
-   
+    @staticmethod
+    def e2_unitscore(game: Game, unit : Unit, coord: Coord) -> int:
+        if unit.type == UnitType.AI:
+            return 10*(unit.health + 1)
+        elif unit.type == UnitType.Firewall:
+            center: int = game.options.dim/2
+            rowDist = 1 - abs(coord.row - center)/game.options.dim
+            colDist = 1 - abs(coord.col - center)/game.options.dim
+            return (rowDist + colDist) / 4 + (unit.health+1)/2
+        elif unit.type == UnitType.Tech:
+            points = 0
+            for adj in coord.iter_adjacent():
+                adjacent = game.get(adj)
+                if adjacent is not None and adjacent.type == UnitType.Firewall and unit.player == adjacent.player:
+                    points += (adjacent.health+1)
+            
+            return max(points,10)
+        elif unit.type == UnitType.Virus:
+            points = 0
+            for adj in coord.iter_adjacent():
+                adjacent = game.get(adj)
+                if adjacent is not None and unit.player != adjacent.player:
+                    if adjacent.type == UnitType.AI:
+                        points += 1/(adjacent.health+1) * 10
+                    elif adjacent.type == UnitType.Tech:
+                        points += 1/(adjacent.health+1) * 5
+            return points
+        elif unit.type == UnitType.Program:
+            points = 0
+            for adj in coord.iter_adjacent():
+                adjacent = game.get(adj)
+                if adjacent is not None and unit.player != adjacent.player:
+                    if adjacent.type == UnitType.AI:
+                        points += 1/(adjacent.health+1) * 10
+                    elif adjacent.type == UnitType.Virus:
+                        points += 1/(adjacent.health+1) * 5
+                    elif adjacent.type == UnitType.Tech:
+                        points += 1/(adjacent.health+1) * 5
+            return points
+        return 0
+
+    @staticmethod
+    def e2(game: Game) -> int:
+        pos : int = 0
+        neg : int = 0
+        for coord in CoordPair.from_dim(game.options.dim).iter_rectangle():
+            unit = game.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker:
+                    pos += AI.e2_unitscore(game, unit, coord)
+                else:
+                    neg += AI.e2_unitscore(game, unit, coord)
+        return pos - neg
 
     @staticmethod
     def call_heuristic(heuristic: Heuristic, game: Game) -> int:
@@ -403,6 +456,9 @@ class AI:
                 if (is_maximizing and score > best_score) or (not is_maximizing and score < best_score):
                     best_score = score
                     best_move = move
+
+                if (datetime.now() - game.stats.start_time).total_seconds() + 0.1 >= game.options.max_time:
+                    break
 
                 # update stats (still TO-DO, this is mostly garbage)
                 total_depth += avg_depth + 1
@@ -455,6 +511,9 @@ class AI:
 
                 if beta <= alpha:
                     break  # prune
+
+                if (datetime.now() - game.stats.start_time).total_seconds() + 0.1 >= game.options.max_time:
+                    break
 
                 # update stats (still TO-DO, this is mostly garbage)
                 total_depth += avg_depth + 1
@@ -812,13 +871,13 @@ class Game:
 
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta."""
-        start_time = datetime.now()
+        self.stats.start_time = datetime.now()
 
         if self.options.randomize_moves:
             (score, move, avg_depth) = self.random_move()
         else:
             (score, move, avg_depth) = self.ai_move()
-        elapsed_seconds = (datetime.now() - start_time).total_seconds()
+        elapsed_seconds = (datetime.now() - self.stats.start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
         print(f"Average recursive depth: {avg_depth:0.1f}")
@@ -981,11 +1040,10 @@ def main():
     # create a new game
     game = Game(options=options)
     options.game_type = GameType.CompVsComp
-    options.alpha_beta = False
-    options.max_depth = 4
+    options.alpha_beta = True
     options.randomize_moves = False
-    options.heuristic = Heuristic.e0
-    game.output_file_initial()
+    options.heuristic = Heuristic.e2
+
     # the main game loop
     while True:
         print()
