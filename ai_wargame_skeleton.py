@@ -287,7 +287,7 @@ class Stats:
     evaluations_per_depth: dict[int, int] = field(default_factory=dict)
     start_time: float = 0.0
     total_seconds: float = 0.0
-
+    cumulative_eval_per_depth: dict[int, int] = field(default_factory=dict)
 
 ##############################################################################################################
 
@@ -972,10 +972,12 @@ class Game:
                 self.options.game_type == GameType.CompVsComp):
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
             l5 = f"Heuristic score: {score}\n"
-            l6 = f"The number of states evaluated since the beginning of the game: {sum(self.stats.evaluations_per_depth.values())} \n"
+
             for k in sorted(self.stats.evaluations_per_depth.keys()):
-                depthEval += f"{k} has cumulative evals: {self.stats.evaluations_per_depth[k]}, \n"
-                depthEvalPercent += f"{k} has {self.stats.evaluations_per_depth[k] / sum(self.stats.evaluations_per_depth.values())}% \n"
+                self.stats.cumulative_eval_per_depth[k] = self.stats.evaluations_per_depth.get(k,0)
+                depthEval += f"{k} has cumulative evals: {self.stats.cumulative_eval_per_depth[k]}, \n"
+                depthEvalPercent += f"{k} has {self.stats.cumulative_eval_per_depth[k] / sum(self.stats.cumulative_eval_per_depth.values())}% \n"
+            l6 = f"The number of states evaluated since the beginning of the game: {self.stats.cumulative_eval_per_depth} \n"
             l7 = "The number of states evaluated by depth: " + depthEval
             l8 = "The cumulative evals by depth in Percentage: " + depthEvalPercent
             l9 = f"Average Branching factor: {sum(self.stats.evaluations_per_depth.values()) / len(self.stats.evaluations_per_depth)} \n"
