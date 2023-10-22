@@ -430,16 +430,13 @@ class AI:
             return AI.call_heuristic(heuristic, game), None, 0
 
         # Define Variables
-        total_depth = 0  # total depth of search
         moves = game.move_candidates()  # all possible moves this turn
         best_move = None  # best possible move
         best_score = 0  # score associated with best move
 
         # set the best score depending on if we're maximizing or minimizing
-        if is_maximizing:
-            best_score = MIN_HEURISTIC_SCORE
-        else:
-            best_score = MAX_HEURISTIC_SCORE
+        if is_maximizing:   best_score = MIN_HEURISTIC_SCORE
+        else:               best_score = MAX_HEURISTIC_SCORE
 
         # loop through each possible move
         for move in moves:
@@ -450,22 +447,22 @@ class AI:
                 # progress the game
                 game_clone.next_turn()
                 # evaluate the next series of moves
-                (score, _, avg_depth) = AI.mini_max(game_clone, depth - 1, heuristic, not is_maximizing)
+                (score, _, _) = AI.mini_max(game_clone, depth - 1, heuristic, not is_maximizing)
 
                 # update max score based on if we're maximizing or minimizing
                 if (is_maximizing and score > best_score) or (not is_maximizing and score < best_score):
                     best_score = score
                     best_move = move
 
+                #if we're about to exceed maximum time, cut our losses and return our best guess.
                 if (datetime.now() - game.stats.start_time).total_seconds() + 0.1 >= game.options.max_time:
                     break
 
-                # update stats (still TO-DO, this is mostly garbage)
-                total_depth += avg_depth + 1
-                game.stats.evaluations_per_depth.update(depth=total_depth)
+                # update stats
+                game.stats.evaluations_per_depth[game.options.max_depth - depth] = game.stats.evaluations_per_depth.get(game.options.max_depth - depth, 0) + 1
 
         # we've looped through all the moves, return the best one
-        return best_score, best_move, total_depth
+        return best_score, best_move, 0
 
     @staticmethod
     def alpha_beta(game: Game, depth: int,  heuristic: Heuristic,  is_maximizing: bool = True, alpha :int = MIN_HEURISTIC_SCORE, beta: int = MAX_HEURISTIC_SCORE) \
@@ -475,16 +472,13 @@ class AI:
             return AI.call_heuristic(heuristic, game), None, 0
 
         # Define Variables
-        total_depth = 0  # total depth of search
         moves = game.move_candidates()  # all possible moves this turn
         best_move = None  # best possible move
         best_score = 0  # score associated with best move
 
         # set the best score depending on if we're maximizing or minimizing
-        if is_maximizing:
-            best_score = MIN_HEURISTIC_SCORE
-        else:
-            best_score = MAX_HEURISTIC_SCORE
+        if is_maximizing:   best_score = MIN_HEURISTIC_SCORE
+        else:               best_score = MAX_HEURISTIC_SCORE
 
         # loop through each possible move
         for move in moves:
@@ -495,9 +489,9 @@ class AI:
                 # progress the game
                 game_clone.next_turn()
                 # evaluate the next series of moves
-                (score, _, avg_depth) = AI.alpha_beta(game_clone, depth - 1, heuristic, not is_maximizing, alpha, beta)
+                (score, _, _) = AI.alpha_beta(game_clone, depth - 1, heuristic, not is_maximizing, alpha, beta)
 
-                # update max score based on if we're maximizing or minimizing
+                # update max score based on if we're maximizing or minimizing and update constraints
                 if is_maximizing:
                     alpha = max(alpha, best_score)
                     if score > best_score:
@@ -509,18 +503,19 @@ class AI:
                         best_score = score
                         best_move = move
 
+                #enforce constraints
                 if beta <= alpha:
                     break  # prune
 
+                #if we're about to exceed maximum time, cut our losses and return our best guess.
                 if (datetime.now() - game.stats.start_time).total_seconds() + 0.1 >= game.options.max_time:
                     break
 
-                # update stats (still TO-DO, this is mostly garbage)
-                total_depth += avg_depth + 1
-                game.stats.evaluations_per_depth.update(depth=total_depth)
+                # update stats
+                game.stats.evaluations_per_depth[game.options.max_depth - depth] = game.stats.evaluations_per_depth.get(game.options.max_depth - depth, 0) + 1
 
         # we've looped through all the moves, return the best one
-        return best_score, best_move, total_depth
+        return best_score, best_move, 0
 
 
 ##############################################################################################################
@@ -814,6 +809,10 @@ class Game:
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
                 self.next_turn()
+            else:
+                #If an AI gives an invalid move, end the game.
+                print("Computer has outputted an invalid move, this should never happen!!!")
+                exit(1)     
         return mv
 
     def player_units(self, player: Player) -> Iterable[Tuple[Coord, Unit]]:
@@ -880,7 +879,7 @@ class Game:
         elapsed_seconds = (datetime.now() - self.stats.start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
-        print(f"Average recursive depth: {avg_depth:0.1f}")
+        #print(f"Average recursive depth: {avg_depth:0.1f}")
         print(f"Evals per depth: ", end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
             print(f"{k}:{self.stats.evaluations_per_depth[k]} ", end='')
