@@ -316,46 +316,30 @@ class AI:
         return pos - neg
 
     @staticmethod
-    def proximity_score(game: Game, player_coord: Coord, enemy_units: Iterable[tuple[Coord, Unit]]):
-        """Encourage getting closer to units you have favorable match-up over"""
-        score = 0
-        player_unit = game.get(player_coord)
-        # Firewall board control is priority
-        if player_unit.type == UnitType.Firewall:
-            distance = CoordPair.distance(player_coord, Coord(2, 2))
-            score += 100 / distance + 1
-        for enemy_coord, enemy_unit in enemy_units:
-            distance = CoordPair.distance(player_coord, enemy_coord)
-            damage_amount = player_unit.damage_amount(enemy_unit)
-            if (player_unit.type == UnitType.Virus and enemy_unit.type == UnitType.AI):
-                score += 4 * damage_amount / distance + 1
-            # extra points if a Tech unit is close to the enemy AI
-            if player_unit.type == UnitType.Virus and enemy_unit.type == UnitType.Tech:
-                score += 2 * damage_amount / distance + 1
-            else:
-                score += damage_amount / distance
-
-        return score
-
-    @staticmethod
-    def health_score(enemy_units: Iterable[tuple[Coord, Unit]]):
-        """Calculates a score based on the enemy units' health."""
-        score = 0
-        for _, unit in enemy_units:
-            score -= unit.health
-        return score
-
-    @staticmethod
     def e1(game: Game) -> int:
         """Heuristic that calculates the score of the game
         based on the proximity of the player's units to the enemy's units and the health of enemy units."""
-        attacker_units = game.player_units(Player.Attacker)
-        defender_units = game.player_units(Player.Defender)
 
-        attacker_score = AI.health_score(defender_units)
-        defender_score = AI.health_score(attacker_units)
-
-        return attacker_score - defender_score
+        pos : int = 0
+        neg : int = 0
+        for coord in CoordPair.from_dim(game.options.dim).iter_rectangle():
+            unit = game.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker:
+                    pos += unit.health
+                    for adj in coord.iter_adjacent():
+                        adjacent = game.get(adj)
+                        if adjacent is not None and unit.player != adjacent.player:
+                            if unit.type != UnitType.AI:
+                                pos += 2
+                else:
+                    neg += unit.health
+                    for adj in coord.iter_adjacent():
+                        adjacent = game.get(adj)
+                        if adjacent is not None and unit.player != adjacent.player:
+                            if unit.type != UnitType.AI:
+                                pos += 2
+        return pos - neg
 
     @staticmethod
     def e2_unitscore(game: Game, unit : Unit, coord: Coord) -> int:
@@ -966,7 +950,7 @@ class Game:
         l2 = f"Current Player: {self.next_player.name} \n"
         l3 = f"Action Taken:{output} \n"
 
-        if self.options.game_type == GameType.CompVsComp or (self.options.game_type == GameType.AttackerVsComp and self.next_player == Player.Defender) or (self.options.game_type == GameType.CompVsDefender and self.next_player == Player.Attacker):
+        if (self.options.game_type == GameType.CompVsComp or (self.options.game_type == GameType.AttackerVsComp and self.next_player == Player.Defender) or (self.options.game_type == GameType.CompVsDefender and self.next_player == Player.Attacker)) and not self.options.randomize_moves:
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
             l5 = f"Heuristic score: {score}\n"
             for k in sorted(self.stats.evaluations_per_depth.keys()):
@@ -1038,9 +1022,9 @@ def main():
     # create a new game (should be commented out in the final version, this is for testing)
     game = Game(options=options)
     #options.game_type = GameType.CompVsComp
-    options.alpha_beta = False
-    options.randomize_moves = False
-    options.heuristic = Heuristic.e2
+    #options.alpha_beta = False
+    #options.randomize_moves = False
+    #options.heuristic = Heuristic.e1
 
 
     game.output_file_initial()
