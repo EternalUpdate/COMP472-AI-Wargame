@@ -711,13 +711,11 @@ class Game:
                     return output
 
             # just moving
-
-
             self.set(coords.dst, self.get(coords.src))
-            self.set(coords.src, None)
-            output = f"Moved from: {self.get(coords.src)} to: {self.get(coords.dst)}\n"
             if (is_real_move == True):
+                output = f"Moved {self.get(coords.src)} from: {coords.src} to: {coords.dst}\n"
                 self.output_file_midgame(output, score)
+            self.set(coords.src, None)
             return (True, "")
         return (False, "invalid move")
 
