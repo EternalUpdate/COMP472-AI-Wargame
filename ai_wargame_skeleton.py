@@ -965,12 +965,10 @@ class Game:
         l1 = f"Turn: {self.turns_played}\n"
         l2 = f"Current Player: {self.next_player.name} \n"
         l3 = f"Action Taken:{output} \n"
-        if (self.options.game_type == GameType.AttackerVsComp and self.next_player.Defender) or (
-                self.options.game_type == GameType.CompVsDefender and self.next_player.Attacker) or (
-                self.options.game_type == GameType.CompVsComp):
+
+        if self.options.game_type == GameType.CompVsComp or (self.options.game_type == GameType.AttackerVsComp and self.next_player == Player.Defender) or (self.options.game_type == GameType.CompVsDefender and self.next_player == Player.Attacker):
             l4 = f"Time for this action: {self.stats.total_seconds} \n"
             l5 = f"Heuristic score: {score}\n"
-
             for k in sorted(self.stats.evaluations_per_depth.keys()):
                 self.stats.cumulative_eval_per_depth[k] =+ self.stats.evaluations_per_depth.get(k,0)
                 depthEval += f"Depth level {k} has cumulative evals: {self.stats.cumulative_eval_per_depth[k]}, \n"
@@ -1036,12 +1034,14 @@ def main():
     if args.broker is not None:
         options.broker = args.broker
 
-    # create a new game
+    # create a new game (should be commented out in the final version, this is for testing)
     game = Game(options=options)
-    options.game_type = GameType.CompVsComp
-    options.alpha_beta = False
-    options.randomize_moves = False
-    options.heuristic = Heuristic.e2
+    #options.game_type = GameType.AttackerVsComp
+    #options.alpha_beta = False
+    #options.randomize_moves = False
+    #options.heuristic = Heuristic.e2
+
+
     game.output_file_initial()
     # the main game loop
     while True:
