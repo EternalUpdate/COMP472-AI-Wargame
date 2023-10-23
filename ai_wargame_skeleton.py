@@ -972,7 +972,8 @@ class Game:
             for k in sorted(self.stats.evaluations_per_depth.keys()):
                 self.stats.cumulative_eval_per_depth[k] =+ self.stats.evaluations_per_depth.get(k,0)
                 depthEval += f"Depth level {k} has cumulative evals: {self.stats.cumulative_eval_per_depth[k]}, \n"
-                depthEvalPercent += f"Depth level {k} has {self.stats.cumulative_eval_per_depth[k] / sum(self.stats.cumulative_eval_per_depth.values())*100}% of states\n"
+            for k in sorted(self.stats.evaluations_per_depth.keys()):
+                depthEvalPercent += f"Depth level {k} has {self.stats.cumulative_eval_per_depth[k] / sum(self.stats.cumulative_eval_per_depth.values()) * 100}% of states\n"
             l6 = f"The number of states evaluated since the beginning of the game: {sum(self.stats.cumulative_eval_per_depth.values())} \n"
             l7 = "The number of states evaluated by depth: \n" + depthEval
             l8 = "The cumulative evals by depth in Percentage: \n" + depthEvalPercent
@@ -1036,10 +1037,10 @@ def main():
 
     # create a new game (should be commented out in the final version, this is for testing)
     game = Game(options=options)
-    #options.game_type = GameType.AttackerVsComp
-    #options.alpha_beta = False
-    #options.randomize_moves = False
-    #options.heuristic = Heuristic.e2
+    #options.game_type = GameType.CompVsComp
+    options.alpha_beta = False
+    options.randomize_moves = False
+    options.heuristic = Heuristic.e2
 
 
     game.output_file_initial()
