@@ -712,8 +712,8 @@ class Game:
         """Pretty text representation of the game."""
         dim = self.options.dim
         output = ""
-        output += f"Next player: {self.next_player.name}\n"
-        output += f"Turns played: {self.turns_played}\n"
+        #output += f"Next player: {self.next_player.name}\n"
+        #output += f"Turns played: {self.turns_played}\n"
         coord = Coord()
         output += "\n   "
         for col in range(dim):
@@ -1021,17 +1021,17 @@ def main():
 
     # create a new game (should be commented out in the final version, this is for testing)
     game = Game(options=options)
-    #options.game_type = GameType.CompVsComp
+    options.game_type = GameType.CompVsComp
     #options.alpha_beta = False
-    #options.randomize_moves = False
+    options.randomize_moves = False
     #options.heuristic = Heuristic.e1
 
 
     game.output_file_initial()
     # the main game loop
     while True:
-        print()
         print(game)
+        print(f"Turns played {game.turns_played} \n ----------------------" )
         winner = game.has_winner()
         if winner is not None:
             game.output_file_endgame()
