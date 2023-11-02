@@ -697,10 +697,11 @@ class Game:
             # just moving
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
+            output = ''
             if (is_real_move == True):
                 output = f"Moved {self.get(coords.dst)} from: {coords.src} to: {coords.dst}\n"
                 self.output_file_midgame(output, score)
-            return (True, "")
+            return (True, output)
         return (False, "invalid move")
 
     def next_turn(self):
@@ -962,7 +963,11 @@ class Game:
             l7 = "The number of states evaluated by depth: \n" + depthEval
             l8 = "The cumulative evals by depth in Percentage: \n" + depthEvalPercent
             values = list(self.stats.cumulative_eval_per_depth.values())
-            total_non_leaf_nodes = sum(values[:-1]) #exclude the last depth level (leaf nodes)
+            total_non_leaf_nodes = 0
+            if (len(values) > 1):
+                total_non_leaf_nodes = sum(values[:-1]) #exclude the last depth level (leaf nodes)
+            else:
+                total_non_leaf_nodes = sum(values)
             l9 = f"Average Branching factor: {sum(self.stats.cumulative_eval_per_depth.values()) / total_non_leaf_nodes} \n"
         else:
             l4, l5, l6, l7, l8, l9 = "", "", "", "", "", ""
@@ -1022,8 +1027,9 @@ def main():
     # create a new game (should be commented out in the final version, this is for testing)
     game = Game(options=options)
     options.game_type = GameType.CompVsComp
-    #options.alpha_beta = False
+    options.alpha_beta = False
     options.randomize_moves = False
+    options.max_depth =1
     #options.heuristic = Heuristic.e1
 
 
